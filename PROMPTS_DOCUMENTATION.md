@@ -1094,3 +1094,206 @@ The extension automatically manages:
 ```
 
 ---
+
+## 8. Дополнительные Промпты Инструментов и CLI (Additional Tool & CLI Prompts)
+
+Промпты для специфичных инструментов, CLI интерфейса и служебных функций.
+
+### 8.1. CLI Промпт - Интерфейс Командной Строки
+
+**Файл:** `crates/goose-cli/src/session/prompt.rs` (встроенный в код)
+
+**Назначение:** Информирование агента о работе через CLI интерфейс с объяснением доступных slash-команд и горячих клавиш.
+
+**Доступные slash-команды:**
+- `/exit` или `/quit` - Выход из сессии
+- `/t` - Переключение между Light/Dark/Ansi темами
+- `/?` или `/help` - Показать справку
+
+**Горячие клавиши:**
+- `Ctrl+C` - Прервать текущее взаимодействие (сброс к состоянию до прерванного запроса)
+- `Ctrl+J` - Добавить новую строку
+- `Up/Down arrows` - Навигация по истории команд
+
+```markdown
+You are being accessed through a command-line interface. The following slash commands are available
+- you can let the user know about them if they need help:
+
+- /exit or /quit - Exit the session
+- /t - Toggle between Light/Dark/Ansi themes
+- /? or /help - Display help message
+
+Additional keyboard shortcuts:
+- Ctrl+C - Interrupt the current interaction (resets to before the interrupted request)
+- Ctrl+J - Add a newline
+- Up/Down arrows - Navigate command history
+```
+
+---
+
+### 8.2. Final Output Tool - Валидация Финального Вывода
+
+**Файл:** `crates/goose/src/agents/final_output_tool.rs` (встроенный в код)
+
+**Назначение:** Инструмент для сбора финального вывода для пользователя с валидацией структурированного JSON вывода против предопределенной схемы.
+
+**Ключевые функции:**
+- Сбор финального вывода для пользователя
+- Обеспечение соответствия вывода ожидаемой JSON структуре
+- Предоставление четкой обратной связи при несоответствии схеме
+
+**Использование:**
+- ОБЯЗАТЕЛЬНО вызвать `final_output` tool с финальным выводом для пользователя
+- Передать JSON вывод как аргумент
+- При ошибке валидации получите конкретные ошибки и ожидаемый формат
+
+**Структура промпта:**
+```markdown
+The final_output tool collects the final output for the user and provides validation for structured JSON final output against a predefined schema.
+
+This final_output tool MUST be called with the final output for the user.
+
+Purpose:
+- Collects the final output for the user
+- Ensures that final outputs conform to the expected JSON structure
+- Provides clear validation feedback when outputs don't match the schema
+
+Usage:
+- Call the `final_output` tool with your JSON final output passed as the argument.
+
+The expected JSON schema format is:
+{json_schema}
+
+When validation fails, you'll receive:
+- Specific validation errors
+- The expected format
+```
+
+**Сообщение продолжения:**
+```
+You MUST call the `final_output` tool NOW with the final output for the user.
+```
+
+---
+
+### 8.3. Platform Manage Schedule Tool - Управление Расписанием Рецептов
+
+**Файл:** `crates/goose/src/agents/platform_tools.rs` (встроенный в код)
+
+**Назначение:** Управление запланированным выполнением рецептов для данного экземпляра Goose.
+
+**Доступные действия:**
+- `list` - Список всех запланированных задач
+- `create` - Создать новую запланированную задачу из файла рецепта
+- `run_now` - Выполнить запланированную задачу немедленно
+- `pause` - Приостановить запланированную задачу
+- `unpause` - Возобновить приостановленную задачу
+- `delete` - Удалить запланированную задачу
+- `kill` - Завершить текущую выполняющуюся задачу
+- `inspect` - Получить детали о выполняющейся задаче
+- `sessions` - Список истории выполнения для задачи
+- `session_content` - Получить полное содержимое (сообщения) конкретной сессии
+
+**Параметры:**
+- `action` (обязательный) - Действие для выполнения
+- `job_id` - Идентификатор задачи для операций с существующими задачами
+- `recipe_path` - Путь к файлу рецепта для create
+- `cron_expression` - Cron выражение для create (поддерживает 5 и 6 полей)
+- `limit` - Лимит для списка сессий (по умолчанию 50)
+- `session_id` - Идентификатор сессии для session_content
+
+**Аннотации:**
+- Read-only: false
+- Destructive: true (может завершать задачи)
+
+```markdown
+Manage scheduled recipe execution for this goose instance.
+
+Actions:
+- "list": List all scheduled jobs
+- "create": Create a new scheduled job from a recipe file
+- "run_now": Execute a scheduled job immediately
+- "pause": Pause a scheduled job
+- "unpause": Resume a paused job
+- "delete": Remove a scheduled job
+- "kill": Terminate a currently running job
+- "inspect": Get details about a running job
+- "sessions": List execution history for a job
+- "session_content": Get the full content (messages) of a specific session
+```
+
+---
+
+### 8.4. Dynamic Task Creation Tool - Создание Субагентских Задач
+
+**Файл:** `crates/goose/src/agents/recipe_tools/dynamic_task_tools.rs` (встроенный в код)
+
+**Назначение:** Инструмент для создания динамических задач для выполнения субагентами с различными конфигурациями.
+
+**Параметры задачи:**
+- `task_parameters` - Массив задач (каждая должна иметь либо `instructions` либо `prompt`)
+- `execution_mode` - Режим выполнения (parallel/sequential)
+  - По умолчанию: parallel для множественных задач, sequential для одной
+
+**Каждая задача может включать:**
+- `instructions` или `prompt` - Инструкции для задачи
+- `max_turns` - Максимальное количество ходов для субагента
+- `tools` - Конкретные инструменты для предоставления субагенту
+- `timeout` - Таймаут выполнения
+
+**Режимы выполнения:**
+- **Parallel** - Выполнять задачи параллельно (быстрее, независимые задачи)
+- **Sequential** - Выполнять задачи последовательно (результат одной передается следующей)
+
+**Применение:**
+- Разбиение сложных задач на подзадачи
+- Параллельное выполнение независимых операций
+- Пайплайны обработки с зависимостями между шагами
+
+---
+
+## 9. Дополнительная Информация
+
+### 9.1. Система Шаблонов (Template System)
+
+**Файл:** `crates/goose/src/prompt_template.rs`
+
+**Назначение:** Ядро системы рендеринга шаблонов с использованием MiniJinja.
+
+**Ключевые функции:**
+- `render_global_file(filename, context)` - Рендеринг глобальных файлов промптов из `src/prompts/`
+- `render_inline_once(template, context)` - Одноразовый рендеринг inline шаблонов
+
+**Особенности:**
+- Все промпты из `src/prompts/` встраиваются во время компиляции
+- Использует Jinja2-style синтаксис для шаблонов
+- Поддержка переменных контекста и условной логики
+
+### 9.2. Prompt Manager
+
+**Файл:** `crates/goose/src/agents/prompt_manager.rs`
+
+**Назначение:** Управление сборкой системных промптов с расширениями.
+
+**Функциональность:**
+- Обработка `system_prompt_override` - полная замена системного промпта
+- Обработка `system_prompt_extras` - дополнительные инструкции к системному промпту
+- Интеграция frontend instructions и hints
+- Объединение промптов расширений
+
+---
+
+## Заключение
+
+Эта документация охватывает все основные промпты, используемые в приложении Goose:
+
+1. **Основные системные промпты** - определяют базовое поведение агента
+2. **Промпты управления задачами и рецептами** - для создания переиспользуемых паттернов
+3. **Промпты управления контекстом** - для суммаризации при достижении лимитов
+4. **Промпты выбора инструментов** - для интеллектуальной маршрутизации
+5. **Промпты безопасности** - для анализа разрешений
+6. **Промпты встроенных расширений** - ExtensionManager, Todo, ChatRecall
+7. **Промпты MCP расширений** - Memory, Tutorial, ComputerController
+8. **Дополнительные промпты** - CLI, инструменты, утилиты
+
+Все промпты используют Jinja2-шаблоны для динамического контента и организованы в иерархическую систему от базовых инструкций до специализированных возможностей расширений.
