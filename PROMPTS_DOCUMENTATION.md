@@ -531,3 +531,121 @@ Just continue the conversation naturally based on the summarized context
 ```
 
 ---
+
+## 4. Промпты Выбора и Маршрутизации Инструментов (Tool Selection & Routing Prompts)
+
+Промпты для интеллектуального выбора наиболее релевантных инструментов на основе запроса пользователя.
+
+### 4.1. Промпт LLM Селектора Инструментов (Router Tool Selector Prompt)
+
+**Файл:** `crates/goose/src/prompts/router_tool_selector.md`
+
+**Назначение:** Промпт для AI ассистента выбора инструментов, который находит наиболее релевантные инструменты на основе запроса пользователя. Используется в системе динамического включения инструментов для экономии контекста.
+
+**Ключевые функции:**
+- Анализ запроса пользователя
+- Поиск релевантных инструментов из доступного набора
+- Возврат инструментов в строго определенном формате
+
+**Шаблонные переменные:**
+- `{{tools}}` - список доступных инструментов
+- `{{query}}` - запрос пользователя для поиска инструментов
+
+**Формат вывода:**
+```
+Tool: <tool_name>
+Description: <tool_description>
+Schema: <tool_schema>
+```
+
+**Применение:** Вызывается через инструмент `router__llm_search` когда нужно найти релевантные инструменты.
+
+```markdown
+You are a tool selection assistant. Your task is to find the most relevant tools based on the user's query.
+
+Given the following tools:
+{{ tools }}
+
+Find the most relevant tools for the query: {{ query }}
+
+Return the tools in this exact format for each tool:
+Tool: <tool_name>
+Description: <tool_description>
+Schema: <tool_schema>
+```
+
+---
+
+### 4.2. Инструкции по Динамическому Выбору Инструментов (LLM Tool Selection Instructions)
+
+**Файл:** `crates/goose/src/agents/router_tools.rs` (встроенный в код)
+
+**Назначение:** Инструкции для основного агента о том, как использовать систему динамического включения инструментов через `llm_search` tool. Объясняет, что хотя расширения включены, агент должен динамически загружать только релевантные инструменты для экономии контекстного окна.
+
+**Ключевые особенности:**
+- Объясняет концепцию динамического включения инструментов
+- Экономия места в контекстном окне
+- Фокус на ключевых словах в сообщениях пользователя
+- Фильтрация по extension_name
+- Примеры использования
+
+**Пример использования:**
+- Пользователь: "list the files in the current directory"
+- Query: "list files in current directory"
+- Extension Name: "developer"
+- k: 5
+
+**Список platform инструментов:**
+- search_available_extensions
+- manage_extensions
+- list_resources
+- read_resource
+
+```rust
+pub fn llm_search_tool_prompt() -> String {
+    format!(
+        r#"# LLM Tool Selection Instructions
+    Important: the user has opted to dynamically enable tools, so although an extension could be enabled, \
+    please invoke the llm search tool to actually retrieve the most relevant tools to use according to the user's messages.
+    For example, if the user has 3 extensions enabled, but they are asking for a tool to read a pdf file, \
+    you would invoke the llm_search tool to find the most relevant read pdf tool.
+    By dynamically enabling tools, you (goose) as the agent save context window space and allow the user to dynamically retrieve the most relevant tools.
+    Be sure to format a query packed with relevant keywords to search for the most relevant tools.
+    In addition to the extension names available to you, you also have platform extension tools available to you.
+    The platform extension contains the following tools:
+    - {}
+    - {}
+    - {}
+    - {}
+    "#,
+        SEARCH_AVAILABLE_EXTENSIONS_TOOL_NAME,
+        MANAGE_EXTENSIONS_TOOL_NAME,
+        LIST_RESOURCES_TOOL_NAME,
+        READ_RESOURCE_TOOL_NAME,
+    )
+}
+```
+
+**В виде промпта:**
+```markdown
+# LLM Tool Selection Instructions
+
+Important: the user has opted to dynamically enable tools, so although an extension could be enabled,
+please invoke the llm search tool to actually retrieve the most relevant tools to use according to the user's messages.
+
+For example, if the user has 3 extensions enabled, but they are asking for a tool to read a pdf file,
+you would invoke the llm_search tool to find the most relevant read pdf tool.
+
+By dynamically enabling tools, you (goose) as the agent save context window space and allow the user to dynamically retrieve the most relevant tools.
+
+Be sure to format a query packed with relevant keywords to search for the most relevant tools.
+
+In addition to the extension names available to you, you also have platform extension tools available to you.
+The platform extension contains the following tools:
+- search_available_extensions
+- manage_extensions
+- list_resources
+- read_resource
+```
+
+---
