@@ -423,3 +423,111 @@ IMPORTANT instructions for you to operate as agent:
 ```
 
 ---
+
+## 3. Промпты Управления Контекстом (Context Management Prompts)
+
+Промпты для управления размером контекста и суммаризации истории разговора.
+
+### 3.1. Промпт Одношаговой Суммаризации (One-Shot Summarization Prompt)
+
+**Файл:** `crates/goose/src/prompts/summarize_oneshot.md`
+
+**Назначение:** Промпт для создания комплексной суммаризации истории разговора, когда достигнут лимит контекста LLM. Создает подробное резюме, сохраняющее все технические детали, необходимые для продолжения сессии.
+
+**Контекст использования:**
+- Срабатывает автоматически при достижении лимита контекста
+- Генерирует версию сообщений с удаленными только самыми подробными частями
+- Суммаризация читается агентом (не пользователем) для продолжения сессии
+
+**Ключевые особенности:**
+- Очень подробная суммаризация (может быть длиннее обычной, т.к. только для агента)
+- Хронологический обзор разговора с тегами `<analysis>`
+- 9 обязательных секций (User Intent, Technical Concepts, Files + Code и др.)
+- Усечение длинных аргументов/результатов tool calls
+- Запрет на новые идеи, только подтвержденные пользователем
+
+**Шаблонные переменные:**
+- `{{messages}}` - история сообщений для суммаризации
+
+**Структура суммаризации:**
+1. **User Intent** – Все цели и запросы
+2. **Technical Concepts** – Все обсуждаемые инструменты, методы
+3. **Files + Code** – Просмотренные/отредактированные файлы, полный код, обоснования изменений
+4. **Errors + Fixes** – Баги, решения, изменения по инициативе пользователя
+5. **Problem Solving** – Решенные проблемы или в процессе
+6. **User Messages** – Все сообщения пользователя включая tool calls
+7. **Pending Tasks** – Все нерешенные запросы пользователя
+8. **Current Work** – Активная работа на момент суммаризации
+9. **Next Step** – Только если напрямую продолжает инструкцию пользователя
+
+```markdown
+## Task Context
+- An llm context limit was reached when a user was in a working session with an agent (you)
+- Generate a version of the below messages with only the most verbose parts removed
+- Include user requests, your responses, all technical content, and as much of the original context as possible
+- This will be used to let the user continue the working session
+- Use framing and tone knowing the content will be read an agent (you) on a next exchange to allow for continuation of the session
+
+**Conversation History:**
+{{ messages }}
+
+Wrap reasoning in `<analysis>` tags:
+- Review conversation chronologically
+- For each part, log:
+  - User goals and requests
+  - Your method and solution
+  - Key decisions and designs
+  - File names, code, signatures, errors, fixes
+- Highlight user feedback and revisions
+- Confirm completeness and accuracy
+- This summary will only be read by you so it is ok to make it much longer than a normal summary you would show to a human
+- Do not exclude any information that might be important to continuing a session working with you
+
+### Include the Following Sections:
+1. **User Intent** – All goals and requests
+2. **Technical Concepts** – All discussed tools, methods
+3. **Files + Code** – Viewed/edited files, full code, change justifications
+4. **Errors + Fixes** – Bugs, resolutions, user-driven changes
+5. **Problem Solving** – Issues solved or in progress
+6. **User Messages** – All user messages including tool calls, but truncate long tool call arguments or results
+7. **Pending Tasks** – All unresolved user requests
+8. **Current Work** – Active work at summary request time: filenames, code, alignment to latest instruction
+9. **Next Step** – *Include only if* directly continues user instruction
+
+> No new ideas unless user confirmed
+```
+
+---
+
+### 3.2. Сообщение Продолжения после Суммаризации (Post-Summarization Continuation Message)
+
+**Файл:** `crates/goose/src/context_mgmt/mod.rs` (встроенный в код)
+
+**Назначение:** Автоматически добавляемое системное сообщение ассистента после суммаризации, которое инструктирует агента не упоминать пользователю о процессе суммаризации и продолжать разговор естественно.
+
+**Ключевые особенности:**
+- Видимо только для агента (agent_visible=true, user_visible=false)
+- Добавляется автоматически системой управления контекстом
+- Обеспечивает плавное продолжение разговора без упоминания технических деталей
+
+**Применение:** Автоматически вставляется после summary message при компактификации истории разговора.
+
+```rust
+// Assistant message for continuation (agent_visible=true, user_visible=false)
+let assistant_message = Message::assistant()
+    .with_text(
+        "The previous message contains a summary that was prepared because a context limit was reached.
+Do not mention that you read a summary or that conversation summarization occurred
+Just continue the conversation naturally based on the summarized context"
+    )
+    .with_metadata(MessageMetadata::agent_only());
+```
+
+**В виде промпта:**
+```markdown
+The previous message contains a summary that was prepared because a context limit was reached.
+Do not mention that you read a summary or that conversation summarization occurred
+Just continue the conversation naturally based on the summarized context
+```
+
+---
