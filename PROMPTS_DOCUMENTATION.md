@@ -767,3 +767,143 @@ Please provide a list of tool names that qualify as read-only:
 ```
 
 ---
+
+## 6. Промпты Встроенных Расширений (Built-in Extension Prompts)
+
+Инструкции для встроенных расширений Goose, которые добавляются к системному промпту при включении соответствующего расширения.
+
+### 6.1. Extension Manager - Управление Расширениями
+
+**Файл:** `crates/goose/src/agents/extension_manager_extension.rs` (встроенный в код)
+
+**Назначение:** Инструкции для управления расширениями, их поиска, включения/отключения и работы с ресурсами расширений.
+
+**Доступные инструменты:**
+- `search_available_extensions` - Поиск доступных расширений для включения/отключения
+- `manage_extensions` - Включение или отключение расширений
+- `list_resources` - Список ресурсов из расширений
+- `read_resource` - Чтение конкретных ресурсов из расширений
+
+**Workflow:**
+1. Используйте `search_available_extensions` когда нужно найти доступные расширения
+2. Используйте `manage_extensions` для включения/отключения конкретных расширений по имени
+3. Используйте `list_resources` и `read_resource` для работы с данными и ресурсами расширений
+
+```markdown
+Extension Management
+
+Use these tools to discover, enable, and disable extensions, as well as review resources.
+
+Available tools:
+- search_available_extensions: Find extensions available to enable/disable
+- manage_extensions: Enable or disable extensions
+- list_resources: List resources from extensions
+- read_resource: Read specific resources from extensions
+
+Use search_available_extensions when you need to find what extensions are available.
+Use manage_extensions to enable or disable specific extensions by name.
+Use list_resources and read_resource to work with extension data and resources.
+```
+
+---
+
+### 6.2. Todo - Управление Задачами
+
+**Файл:** `crates/goose/src/agents/todo_extension.rs` (встроенный в код)
+
+**Назначение:** Инструкции для управления задачами через инструменты `todo_read` и `todo_write`. Используется для задач с 2+ шагами, множественными файлами/компонентами или неопределенным объемом работы.
+
+**Когда использовать:**
+- Задачи с 2+ шагами
+- Множественные файлы/компоненты
+- Неопределенный объем работы
+
+**Workflow:**
+1. **Start (Начало):** `todo_read` → `todo_write` для создания checklist
+2. **During (В процессе):** `todo_read` → обновить прогресс
+3. **End (Завершение):** проверить что все завершено
+
+**ВАЖНОЕ ПРЕДУПРЕЖДЕНИЕ:**
+- `todo_write` полностью перезаписывает содержимое
+- ВСЕГДА делайте `todo_read` перед `todo_write`
+- Пропуск чтения - это ошибка
+- Неиспользование todo tools для сложных задач - это ошибка
+
+**Формат элементов:**
+- Короткие, конкретные, ориентированные на действие
+- Используйте чекбоксы и вложенность
+- Отмечайте блокирующие факторы
+
+**Template:**
+```markdown
+- [ ] Implement feature X
+  - [ ] Update API
+  - [ ] Write tests
+  - [ ] Run tests
+  - [ ] Run lint
+- [ ] Blocked: waiting on credentials
+```
+
+**Полный промпт:**
+```markdown
+Task Management
+
+Use todo_read and todo_write for tasks with 2+ steps, multiple files/components, or uncertain scope.
+
+Workflow:
+- Start: read → write checklist
+- During: read → update progress
+- End: verify all complete
+
+Warning: todo_write overwrites entirely; always todo_read first (skipping is an error)
+
+Keep items short, specific, action-oriented. Not using the todo tools for complex tasks is an error.
+
+Template:
+- [ ] Implement feature X
+  - [ ] Update API
+  - [ ] Write tests
+  - [ ] Run tests
+  - [ ] Run lint
+- [ ] Blocked: waiting on credentials
+```
+
+---
+
+### 6.3. Chat Recall - Поиск по Истории Разговоров
+
+**Файл:** `crates/goose/src/agents/chatrecall_extension.rs` (встроенный в код)
+
+**Назначение:** Инструкции для поиска по прошлым разговорам и загрузки сводок сессий, когда пользователь ожидает наличия памяти или контекста из предыдущих взаимодействий.
+
+**Два режима работы:**
+
+**1. Search Mode (Режим поиска):**
+- Используйте параметр `query` с ключевыми словами/синонимами
+- Находит релевантные сообщения из прошлых разговоров
+
+**2. Load Mode (Режим загрузки):**
+- Используйте параметр `session_id`
+- Получает первые и последние сообщения конкретной сессии
+- Полезно для восстановления контекста предыдущей сессии
+
+**Когда использовать:**
+- Пользователь упоминает что-то из прошлых разговоров
+- Пользователь ожидает, что агент "помнит" предыдущий контекст
+- Нужно найти информацию из предыдущих сессий
+
+**Дополнительные параметры:**
+- `after_date` - фильтр по дате (начиная с)
+- `before_date` - фильтр по дате (до)
+
+```markdown
+Chat Recall
+
+Search past conversations and load session summaries when the user expects some memory or context.
+
+Two modes:
+- Search mode: Use query with keywords/synonyms to find relevant messages
+- Load mode: Use session_id to get first and last messages of a specific session
+```
+
+---
