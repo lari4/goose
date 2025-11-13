@@ -649,3 +649,121 @@ The platform extension contains the following tools:
 ```
 
 ---
+
+## 5. Промпты Безопасности и Разрешений (Permission & Security Prompts)
+
+Промпты для анализа операций и определения разрешений на выполнение инструментов.
+
+### 5.1. Промпт Судьи Разрешений (Permission Judge Prompt)
+
+**Файл:** `crates/goose/src/prompts/permission_judge.md`
+
+**Назначение:** Простой системный промпт для AI аналитика, который определяет, являются ли операции read-only (только для чтения) или изменяют данные. Используется для автоматической проверки разрешений.
+
+**Применение:** Используется в системе разрешений для определения, требуется ли подтверждение пользователя перед выполнением операции.
+
+```markdown
+You are a good analyst and can detect operations whether they have read-only operations.
+```
+
+---
+
+### 5.2. Инструмент Анализа Разрешений (Tool-by-Tool Permission Analysis)
+
+**Файл:** `crates/goose/src/permission/permission_judge.rs` (встроенный в код)
+
+**Назначение:** Детальное описание инструмента `platform__tool_by_tool_permission`, который анализирует запросы к инструментам и определяет, какие из них выполняют read-only операции.
+
+**Ключевые функции:**
+- Анализ запросов к инструментам
+- Определение read-only vs write операций
+- Возврат списка инструментов с read-only операциями
+
+**Что считается read-only операцией:**
+- Получение информации без изменения данных или состояния
+- Примеры:
+  - Чтение файла без записи
+  - SELECT запросы в базе данных
+  - Получение информации из API без POST, PUT, DELETE
+
+**Примеры операций:**
+
+**Read Operations (Только чтение):**
+- `SELECT` запросы в SQL
+- Чтение метаданных или содержимого файла
+- Листинг содержимого директории
+
+**Write Operations (Изменение данных):**
+- `INSERT`, `UPDATE`, `DELETE` в SQL
+- Запись или добавление в файл
+- Изменение системных конфигураций
+- Отправка сообщений в Slack канал
+
+**Как анализировать запросы:**
+1. Проверить каждый запрос к инструменту, чтобы определить его цель на основе имени и аргументов
+2. Категоризировать операцию как read-only, если она не изменяет состояние или данные
+3. Вернуть список имен инструментов, которые строго read-only
+4. Если невозможно принять решение, операция НЕ считается read-only
+
+**JSON Schema для вывода:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "read_only_tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional list of tool names which has read-only operations."
+    }
+  },
+  "required": []
+}
+```
+
+**Полный промпт:**
+```markdown
+Analyze the tool requests and determine which ones perform read-only operations.
+
+What constitutes a read-only operation:
+- A read-only operation retrieves information without modifying any data or state.
+- Examples include:
+    - Reading a file without writing to it.
+    - Querying a database without making updates.
+    - Retrieving information from APIs without performing POST, PUT, or DELETE operations.
+
+Examples of read vs. write operations:
+- Read Operations:
+    - `SELECT` query in SQL.
+    - Reading file metadata or content.
+    - Listing directory contents.
+- Write Operations:
+    - `INSERT`, `UPDATE`, or `DELETE` in SQL.
+    - Writing or appending to a file.
+    - Modifying system configurations.
+    - Sending messages to Slack channel.
+
+How to analyze tool requests:
+- Inspect each tool request to identify its purpose based on its name and arguments.
+- Categorize the operation as read-only if it does not involve any state or data modification.
+- Return a list of tool names that are strictly read-only. If you cannot make the decision, then it is not read-only.
+
+Use this analysis to generate the list of tools performing read-only operations from the provided tool requests.
+```
+
+**Формат запроса к LLM:**
+```
+Here are the tool requests: [tool_name_1, tool_name_2, ...]
+
+Analyze the tool requests and list the tools that perform read-only operations.
+
+Guidelines for Read-Only Operations:
+- Read-only operations do not modify any data or state.
+- Examples include file reading, SELECT queries in SQL, and directory listing.
+- Write operations include INSERT, UPDATE, DELETE, and file writing.
+
+Please provide a list of tool names that qualify as read-only:
+```
+
+---
