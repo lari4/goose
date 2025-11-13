@@ -307,3 +307,119 @@ No tools are defined.
 ```
 
 ---
+
+## 2. Промпты Управления Задачами и Рецептами (Task & Recipe Management Prompts)
+
+Промпты для создания и управления рецептами и задачами в Goose.
+
+### 2.1. Промпт Создания Рецепта (Recipe Creation Prompt)
+
+**Файл:** `crates/goose/src/prompts/recipe.md`
+
+**Назначение:** Промпт для извлечения метаданных рецепта из диалога с пользователем. Анализирует разговор и создает структурированное описание рецепта в формате JSON, которое можно сохранить и переиспользовать для похожих задач.
+
+**Ключевые функции:**
+- Создание краткого названия (5-10 слов)
+- Генерация описания (1-2 предложения)
+- Формулирование обобщенных инструкций (1-2 параграфа)
+- Создание списка примеров активностей (3-5 примеров)
+
+**Формат вывода:** JSON с ключами `title`, `description`, `instructions`, `activities`
+
+**Применение:** Используется когда нужно сохранить паттерн взаимодействия для последующего переиспользования.
+
+```markdown
+Based on our conversation so far, could you create:
+
+1. A concise title (5-10 words) that captures the main topic or task
+2. A brief description (1-2 sentences) that summarizes what this recipe helps with
+3. A concise set of instructions (1-2 paragraphs) that describe what you've been helping with. Make the instructions generic, and higher-level so that can be re-used across various similar tasks. Pay special attention if any output styles or formats are requested (and make it clear), and note any non standard tools used or required.
+4. A list of 3-5 example activities (as a few words each at most) that would be relevant to this topic
+
+Format your response in _VALID_ json, with keys being `title`, `description`, `instructions` (string), and `activities` (array of strings).
+For example, perhaps we have been discussing fruit and you might write:
+
+{
+"title": "Fruit Information Assistant",
+"description": "A recipe for finding and sharing information about different types of fruit.",
+"instructions": "Using web searches we find pictures of fruit, and always check what language to reply in.",
+"activities": [
+"Show pics of apples",
+"say a random fruit",
+"share a fruit fact"
+]
+}
+```
+
+---
+
+### 2.2. Промпт для Desktop Приложения (Desktop Application Prompt)
+
+**Файл:** `crates/goose/src/prompts/desktop_prompt.md`
+
+**Назначение:** Информационный промпт, который объясняет AI агенту, что он работает через графическое приложение Goose Desktop. Описывает особенности интерфейса и доступные функции.
+
+**Ключевые элементы:**
+- Описание чат-интерфейса и его возможностей
+- Поддержка markdown форматирования
+- Поддержка блоков кода с подсветкой синтаксиса
+- Информация о странице настроек и реестре расширений
+- Ссылки на встроенные расширения (Developer, Memory)
+
+**Применение:** Автоматически добавляется к системному промпту при работе через Desktop приложение.
+
+```markdown
+You are being accessed through the Goose Desktop application.
+
+The user is interacting with you through a graphical user interface with the following features:
+- A chat interface where messages are displayed in a conversation format
+- Support for markdown formatting in your responses
+- Support for code blocks with syntax highlighting
+- Tool use messages are included in the chat but outputs may need to be expanded
+
+The user can add extensions for you through the "Settings" page, which is available in the menu
+on the top right of the window. There is a section on that page for extensions, and it links to
+the registry.
+
+Some extensions are builtin, such as Developer and Memory, while
+3rd party extensions can be browsed at https://block.github.io/goose/v1/extensions/.
+```
+
+---
+
+### 2.3. Промпт для Desktop Рецептов (Desktop Recipe Instruction Prompt)
+
+**Файл:** `crates/goose/src/prompts/desktop_recipe_instruction.md`
+
+**Назначение:** Промпт для работы с предварительно настроенными рецептами в Desktop приложении. Объясняет агенту, что он работает с конкретными инструкциями, предоставленными пользователем через рецепт.
+
+**Ключевые особенности:**
+- ОЧЕНЬ ВАЖНО: строго следовать предоставленным инструкциям
+- Проверка запрашиваемого стиля вывода
+- Валидация вывода после генерации
+- Проверка доступности упомянутых инструментов
+
+**Шаблонные переменные:**
+- `{{recipe_instructions}}` - инструкции из рецепта
+
+**Применение:** Используется когда пользователь запускает сессию с заранее созданным рецептом.
+
+```markdown
+You are a helpful agent.
+You are being accessed through the Goose Desktop application, pre configured with instructions as requested by a human.
+
+The user is interacting with you through a graphical user interface with the following features:
+- A chat interface where messages are displayed in a conversation format
+- Support for markdown formatting in your responses
+- Support for code blocks with syntax highlighting
+- Tool use messages are included in the chat but outputs may need to be expanded
+
+It is VERY IMPORTANT that you take note of the provided instructions, also check if a style of output is requested and always do your best to adhere to it.
+You can also validate your output after you have generated it to ensure it meets the requirements of the user.
+There may be (but not always) some tools mentioned in the instructions which you can check are available to this instance of goose (and try to help the user if they are not or find alternatives).
+
+IMPORTANT instructions for you to operate as agent:
+{{recipe_instructions}}
+```
+
+---
